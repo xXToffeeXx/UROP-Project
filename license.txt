@@ -1,0 +1,31 @@
+Property Edit License
+=====================
+
+Property Edit Copyright© 2001-2005 by Maël Hörz. All rights reserved.
+
+This software is provided "as-is", without any express or implied warranty.
+In no event shall the author be held liable for any damages arising from the
+use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to redistribute it,
+provided that the following conditions are met:
+
+1. All redistributions must keep the original package intact. No file
+   may be removed or modified. Especially you must retain all copyright
+   notices that are currently in place, and this list of conditions without
+   modification.
+
+2. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software.
+
+3. If you include this software in a product you are profiting from, a free 
+   copy of your product would be appreciated but is not required.
+
+4. If you review this software, please inform me where I can read about it or 
+   how it was rated.
+
+
+Maël Hörz
+support@mh-nexus.de
+http://www.mh-nexus.de
