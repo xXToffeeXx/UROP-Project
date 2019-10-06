@@ -1,0 +1,120 @@
+TXmHotLink
+Maël Hörz
+XmMisc
+www.mh-nexus.de
+
+TXmPinner
+Maël Hörz
+XmMisc
+www.mh-nexus.de
+
+TXmNumEdit
+Maël Hörz
+XmMisc
+www.mh-nexus.de
+
+TXmHexEdit
+Maël Hörz
+XmMiscExt
+www.mh-nexus.de
+
+TXmCoordSys
+Maël Hörz
+XmMisc
+www.mh-nexus.de
+
+TSynEdit
+*
+SynEdit
+http://synedit.sourceforge.net
+
+TTBXToolbar
+Alex A. Denisov
+TBX
+http://g32.org
+
+TTBXToolWindow
+Alex A. Denisov
+TBX
+http://g32.org
+
+TTBXDock
+Alex A. Denisov
+TBX
+http://g32.org
+
+Button
+Microsoft
+Windows Standard
+
+
+ComboBox
+Microsoft
+Windows Standard
+
+
+Edit
+Microsoft
+Windows Standard
+
+
+ListBox
+Microsoft
+Windows Standard
+
+
+MDIClient
+Microsoft
+Windows Standard
+
+
+ScrollBar
+Microsoft
+Windows Standard
+
+
+Static
+Microsoft
+Windows Standard
+
+
+ComboLBox
+Microsoft
+Windows Standard
+
+
+DDEMLEvent
+Microsoft
+Windows Standard
+
+
+Message
+Microsoft
+Windows Standard
+
+
+#32768
+Microsoft
+Windows Standard
+
+
+#32769
+Microsoft
+Windows Standard
+
+
+#32770
+Microsoft
+Windows Standard
+
+
+#32771
+Microsoft
+Windows Standard
+
+
+#32772
+Microsoft
+Windows Standard
+
+

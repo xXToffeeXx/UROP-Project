@@ -6,7 +6,6 @@ bits 32
 ;-----------------------------------------------------------------------------
 
 hldr_begin:
-        pushad                           ;must save ebx/edi/esi/ebp
         push    tebProcessEnvironmentBlock
         pop     eax
         fs mov  eax, dword [eax]
@@ -23,8 +22,6 @@ hldr_begin:
 ;-----------------------------------------------------------------------------
 
         dd      0E9258E7Ah               ;FlushInstructionCache
-        dd      0C97C1FFFh               ;GetProcAddress
-        dd      03FC1BD8Dh               ;LoadLibraryA
         dd      009CE0D4Ah               ;VirtualAlloc
         db      0
 
@@ -84,7 +81,7 @@ crc_skip:
         jnz     walk_names
 
 ;-----------------------------------------------------------------------------
-;allocate memory for mapping
+;allocate executable memory for shellcodeified executable
 ;-----------------------------------------------------------------------------
 
         mov     esi, 0xdeadf00d
@@ -100,190 +97,12 @@ crc_skip:
         mov     ebx, esp
 
 ;-----------------------------------------------------------------------------
-;map MZ header, NT Header, FileHeader, OptionalHeader, all section headers...
+;copy shellcode into executable memory and jump to it
 ;-----------------------------------------------------------------------------
 
-        mov     ecx, 0xdeadb0b0
+        mov     ecx, 0xdeadfeed
         mov     edi, eax
         push    esi
         rep     movsb
         pop     esi
-        mov     edi, eax
-
-        mov     ecx, 0xdeadb0b0
-decrypt_header:        
-        mov     dl, byte [edi]
-        xor     dl, 0xff
-        mov     byte [edi], dl
-        inc     edi
-        loop    decrypt_header
-        mov     ebp, dword [eax + lfanew]
-        add     ebp, eax
-
-;-----------------------------------------------------------------------------
-;map sections data
-;-----------------------------------------------------------------------------
-
-        mov     cx, word [ebp + _IMAGE_NT_HEADERS.nthFileHeader + _IMAGE_FILE_HEADER.fhSizeOfOptionalHeader]
-        lea     edx, dword [ebp + ecx + _IMAGE_NT_HEADERS.nthOptionalHeader]
-        mov     cx, word [ebp + _IMAGE_NT_HEADERS.nthFileHeader + _IMAGE_FILE_HEADER.fhNumberOfSections]
-        xchg    edi, eax
-
-map_section:
-        pushad
-
-        add     esi, dword [edx + _IMAGE_SECTION_HEADER.shPointerToRawData]
-        add     edi, dword [edx + _IMAGE_SECTION_HEADER.shVirtualAddress]
-        mov     ecx, dword [edx + _IMAGE_SECTION_HEADER.shSizeOfRawData]
-        rep     movsb
-
-        popad
-        pushad
-
-        add     edi, dword [edx + _IMAGE_SECTION_HEADER.shVirtualAddress]
-        mov     ecx, dword [edx + _IMAGE_SECTION_HEADER.shSizeOfRawData]
-
-decrypt_section:        
-        movzx   edx, byte [edi]
-        xor     edx, 0xff
-        mov     byte [edi], dl
-        inc     edi
-        loop    decrypt_section
-
-        popad
-        add     edx, _IMAGE_SECTION_HEADER_size
-        loop    map_section
-
-;-----------------------------------------------------------------------------
-;import DLL
-;-----------------------------------------------------------------------------
-
-        pushad
-        mov     cl, IMAGE_DIRECTORY_ENTRY_IMPORT
-        mov     ebp, dword [ecx + ebp]  
-        test    ebp, ebp    ;check if PE has import table
-        je      import_popad     ;if import table not found, skip loading
-        add     ebp, edi
-
-import_dll:
-        mov     ecx, dword [ebp + _IMAGE_IMPORT_DESCRIPTOR.idName]
-        jecxz   import_popad
-        add     ecx, dword [ebx]
-        push    ecx
-        call    dword [ebx + mapstk_size + krncrcstk.kLoadLibraryA]
-        xchg    ecx, eax
-        mov     edi, dword [ebp + _IMAGE_IMPORT_DESCRIPTOR.idFirstThunk]
-        mov     esi, dword [ebp + _IMAGE_IMPORT_DESCRIPTOR.idOriginalFirstThunk]
-        test    esi, esi    ;if OriginalFirstThunk is NULL... 
-        cmove   esi, edi    ;use FirstThunk instead of OriginalFirstThunk
-        add     esi, dword [ebx]
-        add     edi, dword [ebx]
-
-import_thunks:
-        lodsd
-        test    eax, eax
-        je      import_next
-        btr     eax, 31
-        jc      import_push
-        add     eax, dword [ebx]
-        inc     eax
-        inc     eax
-
-import_push:
-        push    ecx
-        push    eax
-        push    ecx
-        call    dword [ebx + mapstk_size + krncrcstk.kGetProcAddress]
-        pop     ecx
-        stosd
-        jmp     import_thunks
-
-import_next:
-        add     ebp, _IMAGE_IMPORT_DESCRIPTOR_size
-        jmp     import_dll
-
-import_popad:
-        popad
-
-;-----------------------------------------------------------------------------
-;apply relocations
-;-----------------------------------------------------------------------------
-
-        mov     cl, IMAGE_DIRECTORY_ENTRY_RELOCS
-        lea     edx, dword [ebp + ecx]   ;relocation entry in data directory
-        add     edi, dword [edx]
-        xor     ecx, ecx
-
-reloc_block:
-        pushad
-        mov     ecx, dword [edi + IMAGE_BASE_RELOCATION.reSizeOfBlock]
-        sub     ecx, IMAGE_BASE_RELOCATION_size
-        cdq
-
-reloc_addr:
-        movzx   eax, word [edi + edx + IMAGE_BASE_RELOCATION_size]
-        push    eax
-        and     ah, 0f0h
-        cmp     ah, IMAGE_REL_BASED_HIGHLOW << 4
-        pop     eax
-        jne     reloc_abs                ;another type not HIGHLOW
-        and     ah, 0fh
-        add     eax, dword [edi + IMAGE_BASE_RELOCATION.rePageRVA]
-        add     eax, dword [ebx]         ;new base address
-        mov     esi, dword [eax]
-        sub     esi, dword [ebp + _IMAGE_NT_HEADERS.nthOptionalHeader + _IMAGE_OPTIONAL_HEADER.ohImageBasex]
-        add     esi, dword [ebx]
-        mov     dword [eax], esi
-        xor     eax, eax
-
-reloc_abs:
-        test    eax, eax                 ;check for IMAGE_REL_BASED_ABSOLUTE
-        jne     hldr_exit                ;not supported relocation type
-        inc     edx
-        inc     edx
-        cmp     ecx, edx
-        jne     reloc_addr
-        popad
-        add     ecx, dword [edi + IMAGE_BASE_RELOCATION.reSizeOfBlock]
-        add     edi, dword [edi + IMAGE_BASE_RELOCATION.reSizeOfBlock]
-        cmp     dword [edx + 4], ecx
-        jne     reloc_block
-
-;-----------------------------------------------------------------------------
-;call entrypoint
-;
-;to a DLL main:
-;push 0
-;push 1
-;push dword [ebx]
-;mov  eax, dword [ebp + _IMAGE_NT_HEADERS.nthOptionalHeader + _IMAGE_OPTIONAL_HEADER.ohAddressOfEntryPoint]
-;add  eax, dword [ebx]
-;call eax
-;
-;to a RVA (an exported function's RVA, for example):
-;
-;mov  eax, 0xdeadf00d ; replace with addr
-;add  eax, dword [ebx]
-;call eax
-;-----------------------------------------------------------------------------
-
-        xor     ecx, ecx
-        push    ecx
-        push    ecx
-        dec     ecx
-        push    ecx
-        call    dword [ebx + mapstk_size + krncrcstk.kFlushInstructionCache]
-        mov     eax, dword [ebp + _IMAGE_NT_HEADERS.nthOptionalHeader + _IMAGE_OPTIONAL_HEADER.ohAddressOfEntryPoint]
-        add     eax, dword [ebx]
-        call    eax
-
-;-----------------------------------------------------------------------------
-;if fails or returns from host, restore stack and registers and return (somewhere)
-;-----------------------------------------------------------------------------
-
-hldr_exit:
-        lea     esp, dword [ebx + mapstk_size + krncrcstk_size]
-        popad
-        ret     4 
-hldr_end:
-
+        jmp     eax

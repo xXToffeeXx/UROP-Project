@@ -1,0 +1,28 @@
+Version history of Property Edit
+================================
+
+Below you find a list with the added features, changes and fixes for 
+each version.
+
+
+Version 2.5.0.0
+---------------
+
+- VCL (component library of Delphi and C++ Builder) specific information
+  is avaliable:
+  You can identify VCL-only controls like TLabel, TImage, ... and get their
+  Text/Caption, Name, ClassName, Font, Parent, Owner, VCL-Version,
+  Class hierarchy, Boundsrect and Clientrect
+- Changes in Attributes-Tab:
+  - added Window-Style and Extended Window-Style information
+  - added an Icon-control that display the icon of the selected window,
+	which can be saved
+  - added Unicode-checkbox which tells if a window support Unicode or not
+  - generally reorganized
+- many small fixes
+- English version available
+
+older versions
+--------------
+
+I haven't kept a log for the changes made in versions prior to version 2.5.0.0 .
