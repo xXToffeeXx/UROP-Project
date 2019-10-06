@@ -111,7 +111,7 @@ def inject_payload(target, payload, output):
     
 def main(arguments):
     if len(arguments) != 2 or not os.path.isfile(arguments[0]) or not os.path.isfile(arguments[1]):
-        print("Error: Crystal ball broken. You idiot. I need two files (target and payload).")
+        print("Error: I need two files (target and payload).")
         return
 
     if not is_payload_valid(os.path.basename(arguments[1])):
